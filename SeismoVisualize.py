@@ -43,72 +43,82 @@ def DegreesDistance(lat1,lon1,lat2,lon2):
     dist = atan2(sqrt(arg1+arg2),arg3)
     return degrees(dist)
 
+def ProcessTrace(data,Fs):
+
+    # Detrend, remove the mean, and integrate
+    # Multiply by 1000 to make units mm
+    data = detrend(data)
+    data = data - np.mean(data)
+    data = cumtrapz(data,dx=(1./Fs),initial=0) * 1000.
+    return data
+
+def MarkPhase(ax,phase,t,travel_times,yloc,fontsize=20,alpha=0.3):   
+    """ 
+    Mark a phase with a letter on the plot.  The letter
+    is partially transparent until the phase arrives.
+    """ 
+    
+    if phase in travel_times.keys():
+        tarr = travel_times[phase]
+        if t >= tarr:
+            ax.text(tarr,yloc,phase,fontsize=fontsize)
+        else:
+            ax.text(tarr,yloc,phase,fontsize=fontsize,alpha=alpha)
+    else:
+        tarr = None
+    
 ### LOCATION DATA
 
 network = 'IU'
 stationcd = 'ANMO'
 location = '10'
 duration = 60
-time = UTCDateTime('2014-07-07T11:23:58')
+time_str = '2014-07-07T11:23:58'
+time = UTCDateTime(time_str)
 
 station = GetStationLocation(time,network,stationcd,location,duration)
 earthquake = [14.782,-92.371,92.]
 
-stN = GetData(time,network,stationcd,location,'BH1',duration)
-stE = GetData(time,network,stationcd,location,'BH2',duration)
-stZ = GetData(time,network,stationcd,location,'BHZ',duration)
+#stN = GetData(time,network,stationcd,location,'BH1',duration)
+#stE = GetData(time,network,stationcd,location,'BH2',duration)
+#stZ = GetData(time,network,stationcd,location,'BHZ',duration)
 
-dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
+stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
+stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
+stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
+
+
+
 
 # Calculate Travel Times from EQ to Station
-travel_times = getTravelTimes(dist,earthquake[2])
-
-for item in travel_times:
-    if item['phase_name'] == 'P':
-        ptt = item['time']
-    if item['phase_name'] == 'S':
-        stt = item['time']
-        
+dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
+tt = getTravelTimes(dist,earthquake[2])
+travel_times={}
+for item in tt:
+    travel_times[item['phase_name']] = item['time']
 
 # Settings for Visualization
 # Lag
 trail = 10
-Fs = stN[0].stats.sampling_rate
+Fs = int(stN[0].stats.sampling_rate)
 labelsize = 14
 ticksize  = 12
 order_of_mag = 0.1 #mm #### MAKE THIS AUTOMATIC
 
-#stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
-#stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
-#stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
 
 length = len(stN[0].data)
-data = np.zeros([length+trail,7])
+data = np.zeros([length+trail,4])
 
 # Make a time column
 data[:,0] = (1/40.)
 data[:,0] = np.cumsum(data[:,0])
 
-# Detrend each trace
-data[trail:,1] = detrend(stN[0].data)
-data[trail:,2] = detrend(stE[0].data)
-data[trail:,3] = detrend(stZ[0].data)
-
-# Remove the mean of each trace
-data[:,1] = data[:,1] - np.mean(data[:,1])
-data[:,2] = data[:,2] - np.mean(data[:,2])
-data[:,3] = data[:,3] - np.mean(data[:,3])
-
-# Integrate each trace to obtain ground displacement in mm
-data[:,4] = cumtrapz(data[:,1],dx=(1./Fs),initial=0) * 1000.
-data[:,5] = cumtrapz(data[:,2],dx=(1./Fs),initial=0) * 1000.
-data[:,6] = cumtrapz(data[:,3],dx=(1./Fs),initial=0) * 1000.
-
-
+for i,trace in zip(range(1,4),[stN,stE,stZ]):
+    data[trail:,i] = ProcessTrace(trace[0].data,Fs)
 
 # Calculate y-axis Offsetsto plot the traces on a single plot
-offset1 = max(data[:,4]) + abs(min(data[:,5]))*1.1
-offset2 = max(data[:,5]) + abs(min(data[:,6]))*1.1
+offset1 = max(data[:,1]) + abs(min(data[:,2]))*1.1
+offset2 = max(data[:,2]) + abs(min(data[:,3]))*1.1
 offset  = max(offset1,offset2)
 
 # Setup figure and axes
@@ -117,9 +127,9 @@ fig = plt.figure(figsize=(9,9))
 # Determine the limits for the 3D plot
 # This is done by taking the max amplitude with some fudge factor
 # so that all axis have the same scale
-x_lims = max(abs(min(data[:,4]))*0.8,max(data[:,4])*1.2)
-y_lims = max(abs(min(data[:,5]))*0.8,max(data[:,5])*1.2)
-z_lims = max(abs(min(data[:,6]))*0.8,max(data[:,6])*1.2)
+x_lims = max(abs(min(data[:,1]))*0.8,max(data[:,1])*1.2)
+y_lims = max(abs(min(data[:,2]))*0.8,max(data[:,2])*1.2)
+z_lims = max(abs(min(data[:,3]))*0.8,max(data[:,3])*1.2)
 ax_lims = max([x_lims,y_lims,z_lims])
 
 
@@ -130,9 +140,9 @@ for i in range(0,int(length/Fs-trail)):
     
     # Pull out the data that will plot in this frame
     scatter = np.zeros([trail,3])
-    scatter[:,0] = data[i*Fs:(i+trail)*Fs:Fs,4]
-    scatter[:,1] = data[i*Fs:(i+trail)*Fs:Fs,5]
-    scatter[:,2] = data[i*Fs:(i+trail)*Fs:Fs,6]
+    scatter[:,0] = data[i*Fs:(i+trail)*Fs:Fs,1]
+    scatter[:,1] = data[i*Fs:(i+trail)*Fs:Fs,2]
+    scatter[:,2] = data[i*Fs:(i+trail)*Fs:Fs,3]
     
     # Set axes on plot
     ax1 = plt.subplot(221,projection='3d')
@@ -167,13 +177,13 @@ for i in range(0,int(length/Fs-trail)):
     ax1.set_zlim3d(-1*ax_lims,ax_lims)
     
     # Make the 2D seismogram plot
-    ax2.plot(data[:,0],data[:,4],color='k')
-    ax2.plot(data[:,0],data[:,5]+offset,color='k')
-    ax2.plot(data[:,0],data[:,6]+2*offset,color='k')
+    ax2.plot(data[:,0],data[:,1],color='k')
+    ax2.plot(data[:,0],data[:,2]+offset,color='k')
+    ax2.plot(data[:,0],data[:,3]+2*offset,color='k')
     
     # Make and label the scale bar
-    ax2.plot([0.03*max(data[:,0]),0.03*max(data[:,0])],[min(data[:,4]),min(data[:,4])+order_of_mag],color='k',linewidth=2)
-    ax2.text(0.04*max(data[:,0]),min(data[:,4])+(0.35*order_of_mag),'%.2f mm'%order_of_mag,fontsize=labelsize-4)
+    ax2.plot([0.03*max(data[:,0]),0.03*max(data[:,0])],[min(data[:,1]),min(data[:,1])+order_of_mag],color='k',linewidth=2)
+    ax2.text(0.04*max(data[:,0]),min(data[:,1])+(0.35*order_of_mag),'%.2f mm'%order_of_mag,fontsize=labelsize-4)
     
     ax2.text(3000,0.2*order_of_mag,'North - South',fontsize=labelsize-2)
     ax2.text(3000,0.2*order_of_mag+offset,'East - West',fontsize=labelsize-2)
@@ -185,7 +195,7 @@ for i in range(0,int(length/Fs-trail)):
     
     # Set limits
     ax2.set_xlim(min(data[:,0]),max(data[:,0]))
-    ax2.set_ylim(min(data[:,4])*1.3,max(data[:,6])+2.3*offset)
+    ax2.set_ylim(min(data[:,1])*1.3,max(data[:,3])+2.3*offset)
     
     # Time position marker
     ax2.axvline(x=i,color='r')
@@ -193,19 +203,15 @@ for i in range(0,int(length/Fs-trail)):
     # Add website tagline
     ax2.text(0,-0.2,'www.johnrleeman.com',fontsize=labelsize-4,transform = ax2.transAxes)
     
-    # Place phase markers and color them (MAKE FUNCTION)
-    if i>ptt:
-        ax2.text(ptt,max(data[:,6])+2*offset,'P',fontsize=20)
-    else:
-        ax2.text(ptt,max(data[:,6])+2*offset,'P',fontsize=20,alpha=0.3)
-        
-    if i>stt:
-        ax2.text(stt,max(data[:,6])+2*offset,'S',fontsize=20)
-    else:
-        ax2.text(stt,max(data[:,6])+2*offset,'S',fontsize=20,alpha=0.3)
+    # Place phase markers and color them 
+    yloc = max(data[:,3])+2.05*offset
+    MarkPhase(ax2,'P',i,travel_times,yloc)
+    MarkPhase(ax2,'S',i,travel_times,yloc)
     
     plt.suptitle('%d Seconds After Earthquake'%data[i*Fs,0],fontsize=labelsize+5)
     plt.savefig('frame%06d.png'%i)
     plt.clf()
     
-os.system('ffmpeg -r 25 -i frame%06d.png output_ANMO_2014.mp4')
+os.system('ffmpeg -r 25 -i frame%06d.png %s_%s_%s.mp4' %(network,station,time_str))
+# Option to cleanup
+#os.system('rm frame*.png')
