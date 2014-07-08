@@ -141,30 +141,27 @@ earthquake = [14.782,-92.371,92.]
 stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
 stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
 stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
-#stN = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH1.sac')
-#stE = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH2.sac')
-#stZ = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BHZ.sac')
-
-
 
 # Calculate travel times
 travel_times = GetTravelTimes(station,earthquake)
 
-# Settings for Visualization
-# Lag
-
+# Get the sampling rate from a channel, assume that they
+# are all identical.  Force to be an integer. 
 Fs = int(stN[0].stats.sampling_rate)
 
-
+# Get the length of the trace. Again assume that they are all the same
 length = len(stN[0].data)
-data = np.zeros([length+trail,4])
+
+# Make an array of zeros that is longer than the data by the length of 
+# the trail.  This means that the first 10 seconds will have some artifical zeros.
+data = np.zeros([length+trail-1,4])
 
 # Make a time column
 data[:,0] = (1/40.)
-data[:,0] = np.cumsum(data[:,0])
+data[:,0] = np.cumsum(data[:,0]) - ((1./Fs) * trail) 
 
 for i,trace in zip(range(1,4),[stN,stE,stZ]):
-    data[trail:,i] = ProcessTrace(trace[0].data,Fs)
+    data[trail-1:,i] = ProcessTrace(trace[0].data,Fs)
 
 # Calculate y-axis Offsetsto plot the traces on a single plot
 offset1 = max(data[:,1]) + abs(min(data[:,2]))*1.1
