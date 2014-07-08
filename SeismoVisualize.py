@@ -10,6 +10,7 @@ from obspy.taup import getTravelTimes
 from math import degrees,radians,cos,sin,atan2,sqrt,floor
 from obspy.fdsn import Client
 from obspy import UTCDateTime
+import sys
 
 def GetData(t0,net,stn,loc,ch,duration):
     client = Client("IRIS")
@@ -92,7 +93,24 @@ labelsize = 14
 ticksize  = 12
 ###############################################################################
 
-### LOCATION DATA
+### Parse call
+# python SeismoVisualize.py NETWORK STATION LOCATION CHN CHE CHZ TIME DURATION
+try:
+    network = sys.argv[1]
+    stationcd = sys.argv[2]
+    location = sys.argv[3]
+    chn = sys.argv[4]
+    che = sys.argv[5]
+    chz = sys.argv[6]
+    time_str = sys.argv[7]
+    duration = int(sys.argv[8])
+    
+except:
+    print "\n\nINVALID CALL!"
+    print "python SeismoVisualize.py NETWORK STATION LOCATION CHN CHE CHZ TIME DURATION\n"
+    print "python SeismoVisualize.py IU ANMO 10 BH1 BH2 BHZ 2014-07-07T11:23:58 60\n\n"
+    sys.exit()
+    
 
 
 
