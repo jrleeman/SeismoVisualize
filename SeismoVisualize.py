@@ -7,7 +7,7 @@ from scipy import signal
 import mpl_toolkits.mplot3d.axes3d as p3
 import os
 from obspy.taup import getTravelTimes
-from math import degrees,radians,cos,sin,atan2,sqrt
+from math import degrees,radians,cos,sin,atan2,sqrt,floor
 from obspy.fdsn import Client
 from obspy import UTCDateTime
 
@@ -66,8 +66,19 @@ def MarkPhase(ax,phase,t,travel_times,yloc,fontsize=20,alpha=0.3):
             ax.text(tarr,yloc,phase,fontsize=fontsize,alpha=alpha)
     else:
         tarr = None
+        
+        
+def GetTravelTimes(station,earthquake):
+    # Calculate Travel Times from EQ to Station
+    dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
+    tt = getTravelTimes(dist,earthquake[2])
+    travel_times={}
+    for item in tt:
+        travel_times[item['phase_name']] = item['time']
+    return travel_times
     
-### LOCATION DATA
+###############################################################################
+# Change these parameters to modify the plotting behavior
 
 network = 'IU'
 stationcd = 'ANMO'
@@ -75,6 +86,15 @@ location = '10'
 duration = 60
 time_str = '2014-07-07T11:23:58'
 time = UTCDateTime(time_str)
+
+trail = 10
+labelsize = 14
+ticksize  = 12
+###############################################################################
+
+### LOCATION DATA
+
+
 
 station = GetStationLocation(time,network,stationcd,location,duration)
 earthquake = [14.782,-92.371,92.]
@@ -87,23 +107,19 @@ stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
 stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
 stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
 
+#stN = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH1.sac')
+#stE = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH2.sac')
+#stZ = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BHZ.sac')
 
 
 
-# Calculate Travel Times from EQ to Station
-dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
-tt = getTravelTimes(dist,earthquake[2])
-travel_times={}
-for item in tt:
-    travel_times[item['phase_name']] = item['time']
+# Calculate travel times
+travel_times = GetTravelTimes(station,earthquake)
 
 # Settings for Visualization
 # Lag
-trail = 10
+
 Fs = int(stN[0].stats.sampling_rate)
-labelsize = 14
-ticksize  = 12
-order_of_mag = 0.1 #mm #### MAKE THIS AUTOMATIC
 
 
 length = len(stN[0].data)
@@ -120,6 +136,8 @@ for i,trace in zip(range(1,4),[stN,stE,stZ]):
 offset1 = max(data[:,1]) + abs(min(data[:,2]))*1.1
 offset2 = max(data[:,2]) + abs(min(data[:,3]))*1.1
 offset  = max(offset1,offset2)
+
+order_of_mag = 10**floor(np.log10(offset)) #mm #### MAKE THIS AUTOMATIC
 
 # Setup figure and axes
 fig = plt.figure(figsize=(9,9))
