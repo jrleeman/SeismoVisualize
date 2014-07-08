@@ -12,13 +12,28 @@ from obspy.fdsn import Client
 from obspy import UTCDateTime
 import sys
 
+
+
+########## TODO
+# Get event data given time,window,mag cutoff
+
 def GetData(t0,net,stn,loc,ch,duration):
+    """
+    Download data from the IRIS datacenter and output
+    with the instrument response removed and calibrated.
+    Return a station object.
+    """
     client = Client("IRIS")
     st = client.get_waveforms(net, stn, loc, ch, t0, t0+duration*60,attach_response=True)
     #st.remove_response(output="VEL")
     return st
     
-def GetStationLocation(t0,net,stn,loc,duration):    
+def GetStationLocation(t0,net,stn,loc,duration):
+    """
+    Given a time, duration, loc code, and station network/name, get
+    station information from IRIS.  Return a list containing the
+    lat, lon, and elevation.
+    """    
     client = Client("IRIS")
     stn = client.get_stations(starttime=t0,endtime=t0+duration*60,network=net,station=stn,level='station')
     slat = stn[0][0].latitude
@@ -46,9 +61,10 @@ def DegreesDistance(lat1,lon1,lat2,lon2):
     return degrees(dist)
 
 def ProcessTrace(data,Fs):
-
-    # Detrend, remove the mean, and integrate
-    # Multiply by 1000 to make units mm
+    """
+    Take a data array and detrend, remove the mean, and
+    integrate.  Multiply by 1000 to get units in mm.
+    """
     data = detrend(data)
     data = data - np.mean(data)
     data = cumtrapz(data,dx=(1./Fs),initial=0) * 1000.
@@ -71,7 +87,11 @@ def MarkPhase(ax,phase,t,travel_times,yloc,fontsize=20,alpha=0.3):
         
         
 def GetTravelTimes(station,earthquake):
-    # Calculate Travel Times from EQ to Station
+    """
+    Calculate travel times for phases using obspy and reformat
+    the output to be a dictionary with phase name as key and
+    arrival time as the value.
+    """
     dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
     tt = getTravelTimes(dist,earthquake[2])
     travel_times={}
@@ -117,10 +137,10 @@ earthquake = [14.782,-92.371,92.]
 #stE = GetData(time,network,stationcd,location,'BH2',duration)
 #stZ = GetData(time,network,stationcd,location,'BHZ',duration)
 
+# Temporary to keep us from downloading data all the time
 stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
 stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
 stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
-
 #stN = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH1.sac')
 #stE = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BH2.sac')
 #stZ = read('example_data/2014-06-23T20-53-09.IU.SSPA.00.BHZ.sac')
