@@ -17,28 +17,28 @@ import sys
 ########## TODO
 # Get event data given time,window,mag cutoff
 
-def GetData(t0,net,stn,loc,ch,duration):
+def GetData(t0,net,st0,loc,ch,duration):
     """
     Download data from the IRIS datacenter and output
     with the instrument response removed and calibrated.
     Return a station object.
     """
     client = Client("IRIS")
-    st = client.get_waveforms(net, stn, loc, ch, t0, t0+duration*60,attach_response=True)
+    st = client.get_waveforms(net, st0, loc, ch, t0, t0+duration*60,attach_response=True)
     #st.remove_response(output="VEL")
     return st
     
-def GetStationLocation(t0,net,stn,loc,duration):
+def GetStationLocation(t0,net,st0,loc,duration):
     """
     Given a time, duration, loc code, and station network/name, get
     station information from IRIS.  Return a list containing the
     lat, lon, and elevation.
     """    
     client = Client("IRIS")
-    stn = client.get_stations(starttime=t0,endtime=t0+duration*60,network=net,station=stn,level='station')
-    slat = stn[0][0].latitude
-    slon = stn[0][0].longitude
-    selev = stn[0][0].elevation
+    st0 = client.get_stations(starttime=t0,endtime=t0+duration*60,network=net,station=st0,level='station')
+    slat = st0[0][0].latitude
+    slon = st0[0][0].longitude
+    selev = st0[0][0].elevation
     return [slat,slon,selev]
     
 def DegreesDistance(lat1,lon1,lat2,lon2):
@@ -133,24 +133,24 @@ except:
 station = GetStationLocation(time,network,stationcd,location,duration)
 earthquake = [14.782,-92.371,92.]
 
-#stN = GetData(time,network,stationcd,location,'BH1',duration)
-#stE = GetData(time,network,stationcd,location,'BH2',duration)
-#stZ = GetData(time,network,stationcd,location,'BHZ',duration)
+#st0 = GetData(time,network,stationcd,location,'BH1',duration)
+#st1 = GetData(time,network,stationcd,location,'BH2',duration)
+#st2 = GetData(time,network,stationcd,location,'BHZ',duration)
 
 # Temporary to keep us from downloading data all the time
-stN = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
-stE = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
-stZ = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
+st0 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
+st1 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
+st2 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
 
 # Calculate travel times
 travel_times = GetTravelTimes(station,earthquake)
 
 # Get the sampling rate from a channel, assume that they
 # are all identical.  Force to be an integer. 
-Fs = int(stN[0].stats.sampling_rate)
+Fs = int(st0[0].stats.sampling_rate)
 
 # Get the length of the trace. Again assume that they are all the same
-length = len(stN[0].data)
+length = len(st0[0].data)
 
 # Make an array of zeros that is longer than the data by the length of 
 # the trail.  This means that the first 10 seconds will have some artifical zeros.
@@ -160,7 +160,8 @@ data = np.zeros([length+trail-1,4])
 data[:,0] = (1/40.)
 data[:,0] = np.cumsum(data[:,0]) - ((1./Fs) * trail) 
 
-for i,trace in zip(range(1,4),[stN,stE,stZ]):
+# Loop through the three traces and place in data array
+for i,trace in zip(range(1,4),[st0,st1,st2]):
     data[trail-1:,i] = ProcessTrace(trace[0].data,Fs)
 
 # Calculate y-axis Offsetsto plot the traces on a single plot
@@ -273,6 +274,6 @@ for i in range(0,int(length/Fs-trail)):
     plt.savefig('frame%06d.png'%i)
     plt.clf()
     
-os.system('ffmpeg -r 25 -i frame%%06d.png %s_%s_%s.mp4' %(network,stationcd,time_str))
+os.syst1m('ffmpeg -r 25 -i frame%%06d.png %s_%s_%s.mp4' %(network,stationcd,time_str))
 # Option to cleanup
-#os.system('rm frame*.png')
+#os.syst1m('rm frame*.png')
