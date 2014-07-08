@@ -14,7 +14,8 @@ import sys
 
 def GetData(t0,net,stn,loc,ch,duration):
     client = Client("IRIS")
-    st = client.get_waveforms(net, stn, loc, ch, t0, t0+duration*60)
+    st = client.get_waveforms(net, stn, loc, ch, t0, t0+duration*60,attach_response=True)
+    #st.remove_response(output="VEL")
     return st
     
 def GetStationLocation(t0,net,stn,loc,duration):    
@@ -81,13 +82,6 @@ def GetTravelTimes(station,earthquake):
 ###############################################################################
 # Change these parameters to modify the plotting behavior
 
-network = 'IU'
-stationcd = 'ANMO'
-location = '10'
-duration = 60
-time_str = '2014-07-07T11:23:58'
-time = UTCDateTime(time_str)
-
 trail = 10
 labelsize = 14
 ticksize  = 12
@@ -104,6 +98,8 @@ try:
     chz = sys.argv[6]
     time_str = sys.argv[7]
     duration = int(sys.argv[8])
+    time = UTCDateTime(time_str)
+    print network,stationcd,location,chn,che,chz,time_str,duration
     
 except:
     print "\n\nINVALID CALL!"
@@ -183,6 +179,8 @@ for i in range(0,int(length/Fs-trail)):
     # Set axes on plot
     ax1 = plt.subplot(221,projection='3d')
     ax2 = plt.subplot(212)
+    ax3 = plt.subplot(222)
+    ax3.axis('off')
     
     # Make the 3D motion plot
     ax1.tick_params(axis='both', which='major', labelsize=ticksize)
@@ -244,10 +242,20 @@ for i in range(0,int(length/Fs-trail)):
     MarkPhase(ax2,'P',i,travel_times,yloc)
     MarkPhase(ax2,'S',i,travel_times,yloc)
     
+    
+    #### Make the text plot
+    t_offset = 0.08
+    s = 0.9
+    ax3.text(0,s,'Station: %s' %stationcd)
+    ax3.text(0,s-t_offset,  'North-South Disp:  %6.2f' %scatter[-1,0])
+    ax3.text(0,s-2*t_offset,'East-West Disp:    %6.2f' %scatter[-1,1])
+    ax3.text(0,s-3*t_offset,'Up-Down Disp:      %6.2f' %scatter[-1,2])
+    
+    
     plt.suptitle('%d Seconds After Earthquake'%data[i*Fs,0],fontsize=labelsize+5)
     plt.savefig('frame%06d.png'%i)
     plt.clf()
     
-os.system('ffmpeg -r 25 -i frame%06d.png %s_%s_%s.mp4' %(network,station,time_str))
+os.system('ffmpeg -r 25 -i frame%%06d.png %s_%s_%s.mp4' %(network,stationcd,time_str))
 # Option to cleanup
 #os.system('rm frame*.png')
