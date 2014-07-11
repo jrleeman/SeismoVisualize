@@ -15,8 +15,12 @@ def GetData(t0,net,st0,loc,ch,duration):
     Return a station object.
     """
     client = Client("IRIS")
-    st = client.get_waveforms(net, st0, loc, ch, t0, t0+duration*60,attach_response=True)
-    st.remove_response(output="VEL")
+    st = client.get_waveforms(net, st0, loc, ch, t0, t0+duration*60, attach_response=True)
+    st.remove_response()
+    st.detrend(type='demean')
+    st.detrend(type='constant')
+    st.taper(max_percentage=0.05)
+    st.filter('highpass', freq=0.01, corners=4, zerophase=True)
     return st
 
 def GetStationLocation(t0,net,st0,loc,duration):
@@ -37,7 +41,7 @@ def MarkPhase(ax,phase,travel_times,yloc,fontsize=18):
     Mark a phase with a letter on the plot.  The letter
     is partially transparent until the phase arrives.
     """ 
-    
+    tx = None
     if phase in travel_times.keys():
         tarr = travel_times[phase]
         tx = ax.text(tarr, yloc, phase, fontsize=fontsize, alpha=0.3)
@@ -137,6 +141,12 @@ def step(ind):
     #
     figtitle_text.set_text('%.1f Seconds After Earthquake' % t[-1])
 
+    #
+    # Set text for current position
+    #
+    ch1value_text.set_text('E/W Position: %20.3f' %x_data[-1])
+    ch2value_text.set_text('N/S Position: %20.3f' %y_data[-1])
+    ch3value_text.set_text('U/D Position: %20.3f' %z_data[-1])
     return marker_line, s3d, xz_points, yz_points, xy_points, x_marker, y_marker, z_marker, p_text
 
 #
@@ -150,7 +160,7 @@ trail = 10
 
 # Temp
 network = 'IU'
-station_id = 'ANMO'
+station_id = 'CCM'
 loc = '10'
 evt_time_str = '2014-07-07T11:23:58'
 duration = int('60')
@@ -264,7 +274,7 @@ ch2value_text = ax3.text(x_text_loc, y_text_loc-2*y_text_offset, '', transform =
 ch3value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset, '', transform = ax3.transAxes)
 
 ## TESTING FOR POSITION
-station_text.set_text('ANMO')
+station_text.set_text(station_id)
 ch1value_text.set_text('N/S Position: ')
 ch2value_text.set_text('E/W Position: ')
 ch3value_text.set_text('U/D Position: ')
@@ -324,9 +334,10 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-inds = np.arange(350,450)
+# inds = np.arange(350,450)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
-anim.save('test_scipy.mp4')
+anim.save('test_scipy.mp4', bitrate=2500)
+plt.close('all')
