@@ -23,8 +23,42 @@ def step(ind):
     
     # Set Marker Position
     marker_line.set_xdata(cur_time)
+    
+    # Set points projection data
+    xz_points.set_data(x_data, np.ones([trail])*ax_lims)
+    xz_points.set_3d_properties(z_data)
+    
+    yz_points.set_data(np.ones([trail])*-ax_lims, y_data)
+    yz_points.set_3d_properties(z_data)
+    
+    xy_points.set_data(x_data, y_data)
+    xy_points.set_3d_properties(np.ones([trail])*-ax_lims)
+    
+    # Set the marker bars
+    x = [-ax_lims,x_data[-1]]
+    y = [y_data[-1],y_data[-1]]
+    z = [z_data[-1],z_data[-1]]
+    x_marker.set_data(x,y)
+    x_marker.set_3d_properties(z)
+    
+    x = [x_data[-1],x_data[-1]]
+    y = [ax_lims,y_data[-1]]
+    z = [z_data[-1],z_data[-1]]
+    y_marker.set_data(x,y)
+    y_marker.set_3d_properties(z)
+    
+    x = [x_data[-1],x_data[-1]]
+    y = [y_data[-1],y_data[-1]]
+    z = [-ax_lims,z_data[-1]]
+    z_marker.set_data(x,y)
+    z_marker.set_3d_properties(z)
+    
+    #
+    # Set figure text
+    #
+    figtitle_text.set_text('%.1f Seconds After Earthquake' %t[-1])
 
-    return marker_line,s3d
+    return marker_line,s3d,xz_points,yz_points,xy_points
 
 labelsize = 14
 ticksize = 12
@@ -43,7 +77,7 @@ st = st1 + st2 + st3
 #
 st.detrend(type = 'demean')
 st.detrend(type = 'linear')
-st.integrate(type = 'cumtrapz') # Reduces the length by 1 data point
+st.integrate(type = 'cumtrapz',initial=0)
 st.decimate(factor=int(st[0].stats.sampling_rate),no_filter=True)
 
 # Scale to mm
@@ -53,7 +87,7 @@ for tr in st:
 #
 # Make a time array
 #
-time = np.arange(st[0].stats.npts) + 1
+time = np.arange(st[0].stats.npts) 
 time = time / st[0].stats.sampling_rate
 
 #
@@ -63,7 +97,6 @@ time = np.concatenate((np.zeros([trail-1]),time))
 
 for tr in st:
     tr.data = np.concatenate((np.zeros([trail-1]),tr.data))
-
 
 ##################
 ##################
@@ -81,8 +114,8 @@ for tr in st:
     tr_max = max(abs(tr.data))
     tr_amp = abs(max(tr.data) - min(tr.data))
     
-    if tr_max * 1.2 > ax_lims:
-        ax_lims = tr_max * 1.2
+    if tr_max * 1.3 > ax_lims:
+        ax_lims = tr_max * 1.3
         
     if tr_amp > offset:
         offset = tr_amp 
@@ -127,14 +160,14 @@ marker_line = ax2.axvline(x=0,color='r',linewidth=2)
 s3d, = ax1.plot([], [], [], marker='o', linestyle='None')
 
 # Points on plane projections
-xz_points = ax1.plot([], [], [],color='k',marker='o', linestyle='None')
-xy_points = ax1.plot([], [], [],color='k',marker='o', linestyle='None')
-yz_points = ax1.plot([], [], [],color='k',marker='o', linestyle='None')
+xz_points, = ax1.plot([], [], [],color='k',marker='o', linestyle='None',markersize=3)
+xy_points, = ax1.plot([], [], [],color='k',marker='o', linestyle='None',markersize=3)
+yz_points, = ax1.plot([], [], [],color='k',marker='o', linestyle='None',markersize=3)
 
 # Maker bars to current point
-x_marker = ax1.plot([], [], [],color='k')
-y_marker = ax1.plot([], [], [],color='k')
-z_marker = ax1.plot([], [], [],color='k')
+x_marker, = ax1.plot([], [], [],color='k')
+y_marker, = ax1.plot([], [], [],color='k')
+z_marker, = ax1.plot([], [], [],color='k')
 
 ax1.set_xlim3d(-1*ax_lims,ax_lims)
 ax1.set_ylim3d(-1*ax_lims,ax_lims)
@@ -145,6 +178,10 @@ ax1.set_zlim3d(-1*ax_lims,ax_lims)
 # Do the animation
 #
 inds = np.arange(0,len(time))
+
+# TEMP
+#inds = np.arange(500,1000)
+
 anim = FuncAnimation(fig, step, frames=inds, interval=50, repeat_delay=2000,blit=True)
 anim.save('test_scipy.mp4')
 
