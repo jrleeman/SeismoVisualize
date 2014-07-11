@@ -9,11 +9,18 @@ from obspy.taup import getTravelTimes
 from math import degrees, radians, cos, sin, atan2, sqrt, floor
 
 
+# TODO
+# - Add argument parser and docs
+# - Shade surface wave arrivals as an option
+# - Add automatic scale bar
+# - Add coordinate rotation and relabel of plots
+
+
 def GetData(t0, net, st0, loc, ch, duration):
     """
     Download data from the IRIS datacenter and output
     with the instrument response removed and calibrated.
-    Return a station object.
+    A filter is also placed. Return a station object.
     """
     client = Client("IRIS")
     st = client.get_waveforms(net, st0, loc, ch, t0,
@@ -41,7 +48,7 @@ def GetStationLocation(t0, net, st0, loc, duration):
     return [slat, slon, selev]
 
 
-def MarkPhase(ax, phase, travel_times, yloc, fontsize=18):
+def MarkPhase(ax, phase, travel_times, yloc, fontsize=16):
     """
     Mark a phase with a letter on the plot.  The letter
     is partially transparent until the phase arrives.
@@ -49,7 +56,7 @@ def MarkPhase(ax, phase, travel_times, yloc, fontsize=18):
     tx = None
     if phase in travel_times.keys():
         tarr = travel_times[phase]
-        tx = ax.text(tarr, yloc, phase, fontsize=fontsize, alpha=0.3)
+        tx = ax.text(tarr, yloc, phase, fontsize=fontsize, alpha=0.3, ha='center')
     else:
         tarr = None
     return tx
@@ -143,8 +150,11 @@ def step(ind):
     z_marker.set_3d_properties(z)
 
     # Plot phase arrival text markers
-    UpdatePhaseMarker(p_text, travel_times['P'], cur_time)
-    UpdatePhaseMarker(s_text, travel_times['S'], cur_time)
+    for key in phase_markers:
+        phase = phase_markers[key]
+        UpdatePhaseMarker(phase[0], phase[1], cur_time)
+    #UpdatePhaseMarker(p_text, travel_times['P'], cur_time)
+    #UpdatePhaseMarker(s_text, travel_times['S'], cur_time)
 
     #
     # Set figure text
@@ -158,7 +168,7 @@ def step(ind):
     ch2value_text.set_text('N/S Position: %20.3f' % y_data[-1])
     ch3value_text.set_text('U/D Position: %20.3f' % z_data[-1])
     return (marker_line, s3d, xz_points, yz_points, xy_points,
-            x_marker, y_marker, z_marker, p_text)
+            x_marker, y_marker, z_marker)
 
 #
 # Set parameters for the plot here
@@ -171,7 +181,7 @@ trail = 10
 
 # Temp
 network = 'IU'
-station_id = 'CCM'
+station_id = 'ANMO'
 loc = '10'
 evt_time_str = '2014-07-07T11:23:58'
 duration = int('60')
@@ -179,10 +189,7 @@ evt_time = UTCDateTime(evt_time_str)
 chx = 'BH1'
 chy = 'BH2'
 chz = 'BHZ'
-
-st1 = GetData(evt_time, network, station_id, loc, chx, duration)
-st2 = GetData(evt_time, network, station_id, loc, chy, duration)
-st3 = GetData(evt_time, network, station_id, loc, chz, duration)
+phases = ['P', 'S', 'PKiKP', 'JP']
 
 #
 # Get Station and Earthquake Information
@@ -200,9 +207,9 @@ travel_times = GetTravelTimes(station_info, earthquake_info)
 # order for x,y,z axes. Generall that is E-W,N-S,U-D or
 # T,R,Z for rotated systems
 #
-# st1 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
-# st2 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
-# st3 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
+st1 = GetData(evt_time, network, station_id, loc, chx, duration)
+st2 = GetData(evt_time, network, station_id, loc, chy, duration)
+st3 = GetData(evt_time, network, station_id, loc, chz, duration)
 st = st1 + st2 + st3
 
 #
@@ -231,12 +238,11 @@ time = np.concatenate((np.zeros([trail-1]), time))
 for tr in st:
     tr.data = np.concatenate((np.zeros([trail-1]), tr.data))
 
-##################
-##################
-# PLOT
-##################
-##################
-
+#
+#
+# Make the Plot
+#
+#
 
 #
 # Determine the limits and offsets for the 3D plot
@@ -277,9 +283,17 @@ ch2label_text = ax2.text(0.75*max(time), 1.1*offset,
 ch3label_text = ax2.text(0.75*max(time), 2.1*offset,
                          'Up - Down', fontsize=labelsize-2)
 
-p_text = MarkPhase(ax2, 'P', travel_times, max(st[2])+2*offset)
-s_text = MarkPhase(ax2, 'S', travel_times, max(st[2])+2*offset)
-phase_markers = {"P": p_text, "S": s_text}
+#
+# Make the phase marker dictionary
+#
+phase_markers = {}
+for phase in phases:
+    phase_text = MarkPhase(ax2, phase, travel_times, max(st[2])+2.1*offset)
+    if phase_text != None:
+        print 'Adding phase %s to plot at time %.2f' % (phase,travel_times[phase])
+        phase_markers[phase] = [phase_text, travel_times[phase]]
+    else:
+        print 'Phase %s not found in predictions' % phase
 
 # Lables in the text axes
 x_text_loc = 0.2
@@ -297,11 +311,8 @@ ch2value_text = ax3.text(x_text_loc, y_text_loc-2*y_text_offset,
 ch3value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset,
                          '', transform=ax3.transAxes)
 
-# TESTING FOR POSITION
 station_text.set_text('Station %s' % station_id)
-# ch1value_text.set_text('N/S Position: ')
-# ch2value_text.set_text('E/W Position: ')
-# ch3value_text.set_text('U/D Position: ')
+
 
 #
 # 2D Seismogram Plot
@@ -358,7 +369,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-# inds = np.arange(350,450)
+inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
