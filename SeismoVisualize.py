@@ -1,9 +1,77 @@
 from obspy import read
+from obspy.fdsn import Client
+from obspy import UTCDateTime
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
+from obspy.taup import getTravelTimes
+from math import degrees,radians,cos,sin,atan2,sqrt,floor
 
+def GetStationLocation(t0,net,st0,loc,duration):
+    """
+    Given a time, duration, loc code, and station network/name, get
+    station information from IRIS.  Return a list containing the
+    lat, lon, and elevation.
+    """    
+    client = Client("IRIS")
+    st0 = client.get_stations(starttime=t0,endtime=t0+duration*60,network=net,station=st0,level='station')
+    slat = st0[0][0].latitude
+    slon = st0[0][0].longitude
+    selev = st0[0][0].elevation
+    return [slat,slon,selev]
+
+def MarkPhase(ax,phase,travel_times,yloc,fontsize=18):   
+    """ 
+    Mark a phase with a letter on the plot.  The letter
+    is partially transparent until the phase arrives.
+    """ 
+    
+    if phase in travel_times.keys():
+        tarr = travel_times[phase]
+        tx = ax.text(tarr, yloc, phase, fontsize=fontsize,alpha=0.3)
+    else:
+        tarr = None
+    return tx
+
+def UpdatePhaseMarker(marker,travel_time,cur_time):
+    if cur_time >= travel_time:
+        marker.set_alpha(1.0)
+        return marker
+    else:
+        return marker
+        
+def GetTravelTimes(station,earthquake):
+    """
+    Calculate travel times for phases using obspy and reformat
+    the output to be a dictionary with phase name as key and
+    arrival time as the value.
+    """
+    dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
+    tt = getTravelTimes(dist,earthquake[2])
+    travel_times={}
+    for item in tt:
+        travel_times[item['phase_name']] = item['time']
+    return travel_times
+
+def DegreesDistance(lat1,lon1,lat2,lon2):
+    """
+    Calcaulate the distance in degrees between two
+    lat/lon pairs.
+    """
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
+    lon1 = radians(lon1)
+    lon2 = radians(lon2)
+    dLat = abs(lat2-lat1)
+    dLon = abs(lon2-lon1)
+    
+    arg1 = (cos(lat2)*sin(dLon))**2
+    arg2 = (cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(dLon))**2
+    arg3 = sin(lat1)*sin(lat2)+cos(lat1)*cos(lat2)*cos(dLon)
+    
+    dist = atan2(sqrt(arg1+arg2),arg3)
+    return degrees(dist)
 
 def step(ind):
     # Slice the data to plot
@@ -49,19 +117,53 @@ def step(ind):
     z_marker.set_data(x, y)
     z_marker.set_3d_properties(z)
 
+    # Plot phase arrival text markers
+    UpdatePhaseMarker(p_text,travel_times['P'],cur_time)
+    UpdatePhaseMarker(s_text,travel_times['S'],cur_time)
+
     #
     # Set figure text
     #
     figtitle_text.set_text('%.1f Seconds After Earthquake' % t[-1])
 
-    return marker_line, s3d, xz_points, yz_points, xy_points, x_marker, y_marker, z_marker
+    return marker_line, s3d, xz_points, yz_points, xy_points, x_marker, y_marker, z_marker, p_text
 
+#
+# Set parameters for the plot here
+# 
+
+# Data
+stn_id = 'ANMO'
+loc = '10'
+
+# Plot
 labelsize = 14
 ticksize = 12
 trail = 10
 
+# Temp
+network = 'IU'
+station_id = 'ANMO'
+loc = '10'
+evt_time_str = '2014-07-07T11:23:58'
+duration = int('60')
+evt_time = UTCDateTime(evt_time_str)
+
 #
-# Read data and combine into stream object
+# Get Station and Earthquake Information
+#
+station_info = GetStationLocation(evt_time,network,station_id,loc,duration)
+earthquake_info = [14.782,-92.371,92.]  # Lat,Lon,Depth
+
+#
+# Calculate phase arrival times
+#
+travel_times = GetTravelTimes(station_info,earthquake_info)
+
+#
+# Read data and combine into stream object, channels should be in
+# order for x,y,z axes. Generall that is E-W,N-S,U-D or 
+# T,R,Z for rotated systems
 #
 st1 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
 st2 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
@@ -125,7 +227,33 @@ ax2 = plt.subplot(2, 1, 2)                   # Seismogram Plot
 ax3 = plt.subplot(2, 2, 2)                   # Text Area Plot
 ax3.axis('off')  # Turn off the border for text area
 
+#
+# Setup Text on Figure
+#
 figtitle_text = plt.suptitle('', fontsize=labelsize+5)
+
+# Static labels on the 2D plot
+ch1label_text = ax2.text(0.75*max(time), 0.1*offset, 'North - South', fontsize=labelsize-2)
+ch2label_text = ax2.text(0.75*max(time), 1.1*offset, 'East - West', fontsize=labelsize-2)
+ch3label_text = ax2.text(0.75*max(time), 2.1*offset, 'Up - Down', fontsize=labelsize-2)
+p_text = MarkPhase(ax2,'P',travel_times,max(st[2])+2*offset)
+s_text = MarkPhase(ax2,'S',travel_times,max(st[2])+2*offset)
+phase_markers = {"P":p_text,"S":s_text}
+
+# Lables in the text axes
+x_text_loc = 0.2
+y_text_loc = 0.8
+y_text_offset = 0.1
+station_text = ax3.text(x_text_loc, y_text_loc-0*y_text_offset, '', transform = ax3.transAxes)
+ch1value_text = ax3.text(x_text_loc, y_text_loc-1*y_text_offset, '', transform = ax3.transAxes)
+ch2value_text = ax3.text(x_text_loc, y_text_loc-2*y_text_offset, '', transform = ax3.transAxes)
+ch3value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset, '', transform = ax3.transAxes)
+
+## TESTING FOR POSITION
+station_text.set_text('ANMO')
+ch1value_text.set_text('N/S Position: ')
+ch2value_text.set_text('E/W Position: ')
+ch3value_text.set_text('U/D Position: ')
 
 #
 # 2D Seismogram Plot
@@ -145,6 +273,7 @@ for (i, tr) in enumerate(st):
 
 # Set limits
 ax2.set_xlim(min(time), max(time))
+ax2.set_ylim(-offset*.75,2.75*offset)
 
 # Place the vertical time scroll bar
 marker_line = ax2.axvline(x=0, color='r', linewidth=2)
@@ -181,7 +310,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-# inds = np.arange(500,1000)
+# inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
