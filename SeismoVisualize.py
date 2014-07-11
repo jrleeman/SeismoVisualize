@@ -8,6 +8,17 @@ from mpl_toolkits.mplot3d import Axes3D
 from obspy.taup import getTravelTimes
 from math import degrees,radians,cos,sin,atan2,sqrt,floor
 
+def GetData(t0,net,st0,loc,ch,duration):
+    """
+    Download data from the IRIS datacenter and output
+    with the instrument response removed and calibrated.
+    Return a station object.
+    """
+    client = Client("IRIS")
+    st = client.get_waveforms(net, st0, loc, ch, t0, t0+duration*60,attach_response=True)
+    st.remove_response(output="VEL")
+    return st
+
 def GetStationLocation(t0,net,st0,loc,duration):
     """
     Given a time, duration, loc code, and station network/name, get
@@ -15,7 +26,7 @@ def GetStationLocation(t0,net,st0,loc,duration):
     lat, lon, and elevation.
     """    
     client = Client("IRIS")
-    st0 = client.get_stations(starttime=t0,endtime=t0+duration*60,network=net,station=st0,level='station')
+    st0 = client.get_stations(starttime=t0, endtime=t0+duration*60, network=net, station=st0, level='station')
     slat = st0[0][0].latitude
     slon = st0[0][0].longitude
     selev = st0[0][0].elevation
@@ -29,7 +40,7 @@ def MarkPhase(ax,phase,travel_times,yloc,fontsize=18):
     
     if phase in travel_times.keys():
         tarr = travel_times[phase]
-        tx = ax.text(tarr, yloc, phase, fontsize=fontsize,alpha=0.3)
+        tx = ax.text(tarr, yloc, phase, fontsize=fontsize, alpha=0.3)
     else:
         tarr = None
     return tx
@@ -47,8 +58,8 @@ def GetTravelTimes(station,earthquake):
     the output to be a dictionary with phase name as key and
     arrival time as the value.
     """
-    dist = DegreesDistance(station[0],station[1],earthquake[0],earthquake[1])
-    tt = getTravelTimes(dist,earthquake[2])
+    dist = DegreesDistance(station[0], station[1], earthquake[0], earthquake[1])
+    tt = getTravelTimes(dist, earthquake[2])
     travel_times={}
     for item in tt:
         travel_times[item['phase_name']] = item['time']
@@ -89,14 +100,14 @@ def step(ind):
     marker_line.set_xdata(cur_time)
 
     # Set points projection data
-    xz_points.set_data(x_data, np.ones([trail])*ax_lims)
+    xz_points.set_data(x_data, np.ones_like(x_data)*ax_lims)
     xz_points.set_3d_properties(z_data)
 
-    yz_points.set_data(np.ones([trail])*-ax_lims, y_data)
+    yz_points.set_data(np.ones_like(y_data)*-ax_lims, y_data)
     yz_points.set_3d_properties(z_data)
 
     xy_points.set_data(x_data, y_data)
-    xy_points.set_3d_properties(np.ones([trail])*-ax_lims)
+    xy_points.set_3d_properties(np.ones_like(z_data)*-ax_lims)
 
     # Set the marker bars
     x = [-ax_lims, x_data[-1]]
@@ -132,10 +143,6 @@ def step(ind):
 # Set parameters for the plot here
 # 
 
-# Data
-stn_id = 'ANMO'
-loc = '10'
-
 # Plot
 labelsize = 14
 ticksize = 12
@@ -148,6 +155,13 @@ loc = '10'
 evt_time_str = '2014-07-07T11:23:58'
 duration = int('60')
 evt_time = UTCDateTime(evt_time_str)
+chx = 'BH1'
+chy = 'BH2'
+chz = 'BHZ'
+
+st1 = GetData(evt_time,network,station_id,loc,chx,duration)
+st2 = GetData(evt_time,network,station_id,loc,chy,duration)
+st3 = GetData(evt_time,network,station_id,loc,chz,duration)
 
 #
 # Get Station and Earthquake Information
@@ -165,9 +179,9 @@ travel_times = GetTravelTimes(station_info,earthquake_info)
 # order for x,y,z axes. Generall that is E-W,N-S,U-D or 
 # T,R,Z for rotated systems
 #
-st1 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
-st2 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
-st3 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
+#st1 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH1.sac')
+#st2 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BH2.sac')
+#st3 = read('example_data/2014-07-07T11-23-58.IU.ANMO.10.BHZ.sac')
 st = st1 + st2 + st3
 
 #
@@ -310,7 +324,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-# inds = np.arange(250,350)
+inds = np.arange(350,450)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
