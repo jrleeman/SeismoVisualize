@@ -410,5 +410,6 @@ inds = np.arange(0, len(time))
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
-anim.save('test_scipy.mp4', bitrate=2500)
+fname = '%s_%s_%s.mp4' % (args.n, args.s, str(args.t))
+anim.save(fname, bitrate=2500)
 plt.close('all')
