@@ -7,11 +7,9 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from obspy.taup import getTravelTimes
 from math import degrees, radians, cos, sin, atan2, sqrt, floor
-import sys
-
+import argparse
 
 # TODO
-# - Add argument parser and docs
 # - Shade surface wave arrivals as an option
 # - Add automatic scale bar
 # - Add coordinate rotation and relabel of plots
@@ -172,32 +170,35 @@ def step(ind):
             x_marker, y_marker, z_marker)
 
 #
-# Set parameters for the plot here
+# Set parameters and parse arguments
 #
+parser = argparse.ArgumentParser(description='Produce a visualization of seismometer data.',
+                                 epilog='Example: python SeismoVisualize.py -n IU -s ADK -l 10 -t 2014-07-07T11:23:58 -d 60 -c BH1 BH2 BHZ -p P S -e 14.782 -92.371 92.')
 
-# Plot
-labelsize = 14
-ticksize = 12
-trail = 15
+parser.add_argument('-s', required=True, type=str, help='Station code of the seismometer')
+parser.add_argument('-n', required=True, type=str, help='Network code of the seismometer')
+parser.add_argument('-l', required=True, type=str, help='Location code of the seismometer')
+parser.add_argument('-c', required=True, type=str, nargs=3, help='Channels listed in x,y,z order (E/W,N/S,U/D)')
+parser.add_argument('-e', required=True, type=float, nargs=3, help='Earthquake latitude, longitude, depth')
+parser.add_argument('-d', required=True, type=int, help='Duration of data to plot (in minutes)')
+parser.add_argument('-t', required=True, type=str, help='Start time in format: YYYY-MM-DDTTT:MM:SS)')
+parser.add_argument('-p', required=True, type=str, nargs='+', help='Phases to plot')
 
-# Temp
-network = 'IU'
-station_id = 'CCM'
-loc = '10'
-evt_time_str = '2014-07-07T11:23:58'
-duration = int('60')
-evt_time = UTCDateTime(evt_time_str)
-chx = 'BH1'
-chy = 'BH2'
-chz = 'BHZ'
-phases = ['P', 'S']
-earthquake_info = [14.782, -92.371, 92.]  # Lat,Lon,Depth
+parser.add_argument('-label', default=14, help='Label size for the plot')
+parser.add_argument('-tick', default=12, help='Tick size for the plot')
+parser.add_argument('-trail', default=15, help='Number of points in the tail of the plot')
+
+args = parser.parse_args()
+args.t = UTCDateTime(args.t)
+trail = args.trail
+labelsize = args.label
+ticksize = args.tick
 
 #
 # Get Station Information
 #
 print 'Fetching Station Information...'
-station_info = GetStationLocation(evt_time, network, station_id, loc, duration)
+station_info = GetStationLocation(args.t, args.n, args.s, args.l, args.d)
 print 'Complete\n'
 
 
@@ -205,7 +206,7 @@ print 'Complete\n'
 # Calculate phase arrival times
 #
 print 'Calculating travel times...'
-travel_times = GetTravelTimes(station_info, earthquake_info)
+travel_times = GetTravelTimes(station_info, args.e)
 print 'Complete\n'
 
 #
@@ -215,11 +216,11 @@ print 'Complete\n'
 #
 print 'Downloading station data:'
 print 'Ch.1'
-st1 = GetData(evt_time, network, station_id, loc, chx, duration)
+st1 = GetData(args.t, args.n, args.s, args.l, args.c[0], args.d)
 print 'Ch.2'
-st2 = GetData(evt_time, network, station_id, loc, chy, duration)
+st2 = GetData(args.t, args.n, args.s, args.l, args.c[1], args.d)
 print 'Ch.3'
-st3 = GetData(evt_time, network, station_id, loc, chz, duration)
+st3 = GetData(args.t, args.n, args.s, args.l, args.c[2], args.d)
 st = st1 + st2 + st3
 print 'Complete\n'
 
@@ -309,7 +310,7 @@ ch3label_text = ax2.text(0.75*max(time), 2.1*offset,
 # Make the phase marker dictionary
 #
 phase_markers = {}
-for phase in phases:
+for phase in args.p:
     phase_text = MarkPhase(ax2, phase, travel_times, max(st[2])+2.1*offset)
     if phase_text != None:
         print 'Adding phase %s to plot at time %.2f' % (phase,travel_times[phase])
@@ -346,7 +347,7 @@ ch1maxvalue_text.set_text('E-W Maximum Dispacement: %5.2f mm' % max(abs(st[0].da
 ch2maxvalue_text.set_text('N-S Maximum Dispacement: %5.2f mm' % max(abs(st[1].data)))
 ch3maxvalue_text.set_text('U-D Maximum Dispacement: %5.2f mm' % max(abs(st[2].data)))
 
-station_text.set_text('Station %s' % station_id)
+station_text.set_text('Station %s' % args.s)
 
 
 #
@@ -404,7 +405,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-inds = np.arange(250,350)
+# inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
