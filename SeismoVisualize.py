@@ -165,9 +165,9 @@ def step(ind):
     #
     # Set text for current position
     #
-    ch1value_text.set_text('E/W Position: %8.3f' % x_data[-1])
-    ch2value_text.set_text('N/S Position: %8.3f' % y_data[-1])
-    ch3value_text.set_text('U/D Position: %8.3f' % z_data[-1])
+    ch1value_text.set_text('E/W Position: %8.3f mm' % x_data[-1])
+    ch2value_text.set_text('N/S Position: %8.3f mm' % y_data[-1])
+    ch3value_text.set_text('U/D Position: %8.3f mm' % z_data[-1])
     return (marker_line, s3d, xz_points, yz_points, xy_points,
             x_marker, y_marker, z_marker)
 
@@ -182,7 +182,7 @@ trail = 15
 
 # Temp
 network = 'IU'
-station_id = 'ADK'
+station_id = 'CCM'
 loc = '10'
 evt_time_str = '2014-07-07T11:23:58'
 duration = int('60')
@@ -286,6 +286,9 @@ ax1.set_xticklabels("")
 ax1.set_yticklabels("") 
 ax1.set_zticklabels("") 
 
+ax1.set_xlabel('East - West',fontsize=labelsize-2)
+ax1.set_ylabel('North - South',fontsize=labelsize-2)
+ax1.set_zlabel('Up - Down',fontsize=labelsize-2)
 
 #
 # Setup Text on Figure
@@ -293,10 +296,10 @@ ax1.set_zticklabels("")
 figtitle_text = plt.suptitle('', fontsize=labelsize+5)
 
 # Static labels on the 2D plot
-ch2label_text = ax2.text(0.75*max(time), 0.1*offset,
+ch1label_text = ax2.text(0.75*max(time), 0.1*offset,
                          'East - West', fontsize=labelsize-2)
-                         
-ch1label_text = ax2.text(0.75*max(time), 1.1*offset,
+
+ch2label_text = ax2.text(0.75*max(time), 1.1*offset,
                          'North - South', fontsize=labelsize-2)
 
 ch3label_text = ax2.text(0.75*max(time), 2.1*offset,
@@ -321,14 +324,27 @@ y_text_offset = 0.1
 station_text = ax3.text(x_text_loc, y_text_loc-0*y_text_offset,
                         '', transform=ax3.transAxes)
 
-ch1value_text = ax3.text(x_text_loc, y_text_loc-1*y_text_offset,
+ch3value_text = ax3.text(x_text_loc, y_text_loc-1*y_text_offset,
                          '', transform=ax3.transAxes)
 
 ch2value_text = ax3.text(x_text_loc, y_text_loc-2*y_text_offset,
                          '', transform=ax3.transAxes)
 
-ch3value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset,
+ch1value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset,
                          '', transform=ax3.transAxes)
+
+ch3maxvalue_text = ax3.text(x_text_loc, y_text_loc-4*y_text_offset,
+                         '', transform=ax3.transAxes)
+
+ch2maxvalue_text = ax3.text(x_text_loc, y_text_loc-5*y_text_offset,
+                         '', transform=ax3.transAxes)
+
+ch1maxvalue_text = ax3.text(x_text_loc, y_text_loc-6*y_text_offset,
+                         '', transform=ax3.transAxes)
+
+ch1maxvalue_text.set_text('E-W Maximum Dispacement: %5.2f mm' % max(abs(st[0].data)))
+ch2maxvalue_text.set_text('N-S Maximum Dispacement: %5.2f mm' % max(abs(st[1].data)))
+ch3maxvalue_text.set_text('U-D Maximum Dispacement: %5.2f mm' % max(abs(st[2].data)))
 
 station_text.set_text('Station %s' % station_id)
 
@@ -388,7 +404,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-#inds = np.arange(250,350)
+inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
