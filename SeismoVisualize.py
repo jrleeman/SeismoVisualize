@@ -7,6 +7,7 @@ from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
 from obspy.taup import getTravelTimes
 from math import degrees, radians, cos, sin, atan2, sqrt, floor
+import sys
 
 
 # TODO
@@ -164,9 +165,9 @@ def step(ind):
     #
     # Set text for current position
     #
-    ch1value_text.set_text('E/W Position: %20.3f' % x_data[-1])
-    ch2value_text.set_text('N/S Position: %20.3f' % y_data[-1])
-    ch3value_text.set_text('U/D Position: %20.3f' % z_data[-1])
+    ch1value_text.set_text('E/W Position: %8.3f' % x_data[-1])
+    ch2value_text.set_text('N/S Position: %8.3f' % y_data[-1])
+    ch3value_text.set_text('U/D Position: %8.3f' % z_data[-1])
     return (marker_line, s3d, xz_points, yz_points, xy_points,
             x_marker, y_marker, z_marker)
 
@@ -177,11 +178,11 @@ def step(ind):
 # Plot
 labelsize = 14
 ticksize = 12
-trail = 10
+trail = 15
 
 # Temp
 network = 'IU'
-station_id = 'ANMO'
+station_id = 'ADK'
 loc = '10'
 evt_time_str = '2014-07-07T11:23:58'
 duration = int('60')
@@ -189,28 +190,39 @@ evt_time = UTCDateTime(evt_time_str)
 chx = 'BH1'
 chy = 'BH2'
 chz = 'BHZ'
-phases = ['P', 'S', 'PKiKP', 'JP']
+phases = ['P', 'S']
+earthquake_info = [14.782, -92.371, 92.]  # Lat,Lon,Depth
 
 #
-# Get Station and Earthquake Information
+# Get Station Information
 #
+print 'Fetching Station Information...'
 station_info = GetStationLocation(evt_time, network, station_id, loc, duration)
-earthquake_info = [14.782, -92.371, 92.]  # Lat,Lon,Depth
+print 'Complete\n'
+
 
 #
 # Calculate phase arrival times
 #
+print 'Calculating travel times...'
 travel_times = GetTravelTimes(station_info, earthquake_info)
+print 'Complete\n'
 
 #
 # Read data and combine into stream object, channels should be in
 # order for x,y,z axes. Generall that is E-W,N-S,U-D or
 # T,R,Z for rotated systems
 #
+print 'Downloading station data:'
+print 'Ch.1'
 st1 = GetData(evt_time, network, station_id, loc, chx, duration)
+print 'Ch.2'
 st2 = GetData(evt_time, network, station_id, loc, chy, duration)
+print 'Ch.3'
 st3 = GetData(evt_time, network, station_id, loc, chz, duration)
 st = st1 + st2 + st3
+print 'Complete\n'
+
 
 #
 # Process the traces
@@ -244,6 +256,8 @@ for tr in st:
 #
 #
 
+print 'Beginning plotting...'
+
 #
 # Determine the limits and offsets for the 3D plot
 #
@@ -268,17 +282,22 @@ ax2 = plt.subplot(2, 1, 2)                   # Seismogram Plot
 ax3 = plt.subplot(2, 2, 2)                   # Text Area Plot
 ax3.axis('off')  # Turn off the border for text area
 
+ax1.set_xticklabels("") 
+ax1.set_yticklabels("") 
+ax1.set_zticklabels("") 
+
+
 #
 # Setup Text on Figure
 #
 figtitle_text = plt.suptitle('', fontsize=labelsize+5)
 
 # Static labels on the 2D plot
-ch1label_text = ax2.text(0.75*max(time), 0.1*offset,
-                         'North - South', fontsize=labelsize-2)
-
-ch2label_text = ax2.text(0.75*max(time), 1.1*offset,
+ch2label_text = ax2.text(0.75*max(time), 0.1*offset,
                          'East - West', fontsize=labelsize-2)
+                         
+ch1label_text = ax2.text(0.75*max(time), 1.1*offset,
+                         'North - South', fontsize=labelsize-2)
 
 ch3label_text = ax2.text(0.75*max(time), 2.1*offset,
                          'Up - Down', fontsize=labelsize-2)
@@ -342,7 +361,7 @@ marker_line = ax2.axvline(x=0, color='r', linewidth=2)
 #
 
 # Main 3D scatter
-s3d, = ax1.plot([], [], [], marker='o', linestyle='None')
+s3d, = ax1.plot([], [], [], marker='o', linestyle='None', color='r')
 
 # Points on plane projections
 xz_points, = ax1.plot([], [], [], color='k', marker='o',
@@ -369,7 +388,7 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 inds = np.arange(0, len(time))
 
 # Reduce size for testing
-inds = np.arange(250,350)
+#inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
