@@ -24,10 +24,10 @@ def GetData(t0, net, st0, loc, ch, duration):
     client = Client("IRIS")
     st = client.get_waveforms(net, st0, loc, ch, t0,
                               t0+duration*60, attach_response=True)
-    st.remove_response()
     st.detrend(type='demean')
-    st.detrend(type='constant')
+    st.detrend(type='linear')
     st.taper(max_percentage=0.05)
+    st.remove_response(output='DISP')
     st.filter('highpass', freq=0.01, corners=4, zerophase=True)
     return st
 
@@ -152,8 +152,6 @@ def step(ind):
     for key in phase_markers:
         phase = phase_markers[key]
         UpdatePhaseMarker(phase[0], phase[1], cur_time)
-    #UpdatePhaseMarker(p_text, travel_times['P'], cur_time)
-    #UpdatePhaseMarker(s_text, travel_times['S'], cur_time)
 
     #
     # Set figure text
@@ -230,7 +228,6 @@ print 'Complete\n'
 #
 st.detrend(type='demean')
 st.detrend(type='linear')
-st.integrate(type='cumtrapz', initial=0)
 st.decimate(factor=int(st[0].stats.sampling_rate), no_filter=True)
 
 # Scale to mm
@@ -283,9 +280,9 @@ ax2 = plt.subplot(2, 1, 2)                   # Seismogram Plot
 ax3 = plt.subplot(2, 2, 2)                   # Text Area Plot
 ax3.axis('off')  # Turn off the border for text area
 
-ax1.set_xticklabels("") 
-ax1.set_yticklabels("") 
-ax1.set_zticklabels("") 
+ax1.set_xticklabels("")
+ax1.set_yticklabels("")
+ax1.set_zticklabels("")
 
 ax1.set_xlabel('East - West',fontsize=labelsize-2)
 ax1.set_ylabel('North - South',fontsize=labelsize-2)
@@ -407,9 +404,6 @@ ax1.set_zlim3d(-1*ax_lims, ax_lims)
 # Do the animation
 #
 inds = np.arange(0, len(time))
-
-# Reduce size for testing
-# inds = np.arange(250,350)
 
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
