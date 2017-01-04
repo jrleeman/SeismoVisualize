@@ -8,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from obspy.taup import getTravelTimes
 from math import degrees, radians, cos, sin, atan2, sqrt, floor
 import argparse
+from sys import platform as _platform
 
 # TODO
 # - Shade surface wave arrivals as an option
@@ -409,5 +410,8 @@ anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
 fname = '%s_%s_%s.mp4' % (args.n, args.s, str(args.t))
+if (_platform == "win32"):
+    fname = fname.replace(':', '-')
+print("Writing to {0}".format(fname));
 anim.save(fname, bitrate=2500)
 plt.close('all')
