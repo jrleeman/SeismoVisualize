@@ -1,5 +1,5 @@
 from obspy import read
-from obspy.fdsn import Client
+from obspy.clients.fdsn import Client
 from obspy import UTCDateTime
 import numpy as np
 import matplotlib.pyplot as plt
