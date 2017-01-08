@@ -1,5 +1,5 @@
 from obspy import read
-from obspy.fdsn import Client
+from obspy.clients.fdsn import Client
 from obspy import UTCDateTime
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +8,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from obspy.taup import getTravelTimes
 from math import degrees, radians, cos, sin, atan2, sqrt, floor
 import argparse
+from sys import platform as _platform
 
 # TODO
 # - Shade surface wave arrivals as an option
@@ -195,32 +196,32 @@ ticksize = args.tick
 #
 # Get Station Information
 #
-print 'Fetching Station Information...'
+print ('Fetching Station Information...')
 station_info = GetStationLocation(args.t, args.n, args.s, args.l, args.d)
-print 'Complete\n'
+print ('Complete\n')
 
 
 #
 # Calculate phase arrival times
 #
-print 'Calculating travel times...'
+print ('Calculating travel times...')
 travel_times = GetTravelTimes(station_info, args.e)
-print 'Complete\n'
+print ('Complete\n')
 
 #
 # Read data and combine into stream object, channels should be in
 # order for x,y,z axes. Generall that is E-W,N-S,U-D or
 # T,R,Z for rotated systems
 #
-print 'Downloading station data:'
-print 'Ch.1'
+print ('Downloading station data:')
+print ('Ch.1')
 st1 = GetData(args.t, args.n, args.s, args.l, args.c[0], args.d)
-print 'Ch.2'
+print ('Ch.2')
 st2 = GetData(args.t, args.n, args.s, args.l, args.c[1], args.d)
-print 'Ch.3'
+print ('Ch.3')
 st3 = GetData(args.t, args.n, args.s, args.l, args.c[2], args.d)
 st = st1 + st2 + st3
-print 'Complete\n'
+print ('Complete\n')
 
 
 #
@@ -254,7 +255,7 @@ for tr in st:
 #
 #
 
-print 'Beginning plotting...'
+print ('Beginning plotting...')
 
 #
 # Determine the limits and offsets for the 3D plot
@@ -310,10 +311,10 @@ phase_markers = {}
 for phase in args.p:
     phase_text = MarkPhase(ax2, phase, travel_times, max(st[2])+2.1*offset)
     if phase_text != None:
-        print 'Adding phase %s to plot at time %.2f' % (phase,travel_times[phase])
+        print ('Adding phase {0:s} to plot at time {1:.2f}'.format(phase,travel_times[phase]))
         phase_markers[phase] = [phase_text, travel_times[phase]]
     else:
-        print 'Phase %s not found in predictions' % phase
+        print ('Phase {0:s} not found in predictions'.format(phase))
 
 # Lables in the text axes
 x_text_loc = 0.2
@@ -409,5 +410,8 @@ anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
 fname = '%s_%s_%s.mp4' % (args.n, args.s, str(args.t))
+if (_platform == "win32"):
+    fname = fname.replace(':', '-')
+print("Writing to {0}".format(fname));
 anim.save(fname, bitrate=2500)
 plt.close('all')
