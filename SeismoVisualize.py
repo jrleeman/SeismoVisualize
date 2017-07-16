@@ -22,7 +22,7 @@ def GetData(t0, net, st0, loc, ch, duration):
     with the instrument response removed and calibrated.
     A filter is also placed. Return a station object.
     """
-    client = Client("IRIS")
+    client = Client('IRIS')
     st = client.get_waveforms(net, st0, loc, ch, t0,
                               t0+duration*60, attach_response=True)
     st.detrend(type='demean')
@@ -39,7 +39,7 @@ def GetStationLocation(t0, net, st0, loc, duration):
     station information from IRIS.  Return a list containing the
     lat, lon, and elevation.
     """
-    client = Client("IRIS")
+    client = Client('IRIS')
     st0 = client.get_stations(starttime=t0, endtime=t0+duration*60,
                               network=net, station=st0, level='station')
     slat = st0[0][0].latitude
@@ -353,8 +353,8 @@ station_text.set_text('Station %s' % args.s)
 #
 
 # Setup Labels
-ax2.set_xlabel(r'Seconds Since Earthquake', fontsize=labelsize)
-ax2.set_ylabel(r'Motion', fontsize=labelsize)
+ax2.set_xlabel('Seconds Since Earthquake', fontsize=labelsize)
+ax2.set_ylabel('Motion', fontsize=labelsize)
 ax2.tick_params(axis='both', which='major', labelsize=ticksize)
 ax2.spines['right'].set_visible(False)
 ax2.spines['top'].set_visible(False)
@@ -366,7 +366,7 @@ ax2.text(0, -0.2, 'www.johnrleeman.com',
 
 # Plot 2D static seismogram data
 for (i, tr) in enumerate(st):
-    ax2.plot(time, tr.data+offset * i, color='k')
+    ax2.plot(time, tr.data+offset * i, color='k', linewidth=1)
 
 # Set limits
 ax2.set_xlim(min(time), max(time))
@@ -378,6 +378,11 @@ marker_line = ax2.axvline(x=0, color='r', linewidth=2)
 #
 # Plot points/bars in 3D scatter
 #
+
+# Maker bars to current point
+x_marker, = ax1.plot([], [], [], color='k')
+y_marker, = ax1.plot([], [], [], color='k')
+z_marker, = ax1.plot([], [], [], color='k')
 
 # Main 3D scatter
 s3d, = ax1.plot([], [], [], marker='o', linestyle='None', color='r')
@@ -392,11 +397,6 @@ xy_points, = ax1.plot([], [], [], color='k', marker='o',
 yz_points, = ax1.plot([], [], [], color='k', marker='o',
                       linestyle='None', markersize=3)
 
-# Maker bars to current point
-x_marker, = ax1.plot([], [], [], color='k')
-y_marker, = ax1.plot([], [], [], color='k')
-z_marker, = ax1.plot([], [], [], color='k')
-
 ax1.set_xlim3d(-1*ax_lims, ax_lims)
 ax1.set_ylim3d(-1*ax_lims, ax_lims)
 ax1.set_zlim3d(-1*ax_lims, ax_lims)
@@ -410,8 +410,8 @@ anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
 fname = '%s_%s_%s.mp4' % (args.n, args.s, str(args.t))
-if (_platform == "win32"):
+if (_platform == 'win32'):
     fname = fname.replace(':', '-')
-print("Writing to {0}".format(fname));
+print('Writing to {0}'.format(fname));
 anim.save(fname, bitrate=2500)
 plt.close('all')
