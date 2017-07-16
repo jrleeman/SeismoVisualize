@@ -361,7 +361,7 @@ ax2.spines['top'].set_visible(False)
 ax2.yaxis.set_ticks_position('left')
 ax2.xaxis.set_ticks_position('bottom')
 ax2.axes.get_yaxis().set_visible(False)
-ax2.text(0, -0.2, 'www.johnrleeman.com',
+ax2.text(0, -0.2, 'www.leemangeophysical.com',
          fontsize=labelsize-4, transform=ax2.transAxes)
 
 # Plot 2D static seismogram data
