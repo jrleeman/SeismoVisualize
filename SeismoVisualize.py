@@ -385,7 +385,8 @@ y_marker, = ax1.plot([], [], [], color='k')
 z_marker, = ax1.plot([], [], [], color='k')
 
 # Main 3D scatter
-s3d, = ax1.plot([], [], [], marker='o', linestyle='None', color='r')
+s3d, = ax1.plot([], [], [], marker='o', linestyle='None', color='r',
+                markeredgecolor='black', markeredgewidth=0.5)
 
 # Points on plane projections
 xz_points, = ax1.plot([], [], [], color='k', marker='o',
