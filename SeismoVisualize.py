@@ -1,7 +1,6 @@
 """Create 3D ground motion visualizations of earth motion."""
 
 import argparse
-from math import atan2, cos, degrees, radians, sin, sqrt
 from sys import platform as _platform
 
 import matplotlib.pyplot as plt
@@ -10,6 +9,8 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client
+from obspy.geodetics import locations2degrees
+from obspy.signal.rotate import rotate2zne
 from obspy.taup import TauPyModel
 
 
@@ -49,6 +50,19 @@ def get_station_location(t0, net, st0, loc, duration):
     return [slat, slon, selev]
 
 
+def get_channel_orientation(t0, net, st0, loc, duration, channel):
+    """
+    Get the station channel orientation.
+
+    Returns azimuth and dip angle.
+    """
+    client = Client('IRIS')
+    st0 = client.get_stations(starttime=t0, endtime=t0+duration*60,
+                              network=net, station=st0, channel=channel,
+                              level='channel')
+    return st0[0][0].channels[0].azimuth, st0[0][0].channels[0].dip
+
+
 def mark_phases(ax, phase, travel_times, yloc, fontsize=16):
     """
     Mark a phase with a letter on the plot.
@@ -83,8 +97,8 @@ def get_travel_times(station, earthquake):
 
     Return a dictionary with phase name as key and arrival time as the value.
     """
-    dist = get_distance_degrees(station[0], station[1],
-                                earthquake[0], earthquake[1])
+    dist = locations2degrees(station[0], station[1],
+                             earthquake[0], earthquake[1])
     model = TauPyModel(model='iasp91')
     arrivals = model.get_travel_times(source_depth_in_km=earthquake[2],
                                       distance_in_degree=dist)
@@ -92,26 +106,6 @@ def get_travel_times(station, earthquake):
     for arrival in arrivals:
         travel_times[arrival.name] = arrival.time
     return travel_times
-
-
-def get_distance_degrees(lat1, lon1, lat2, lon2):
-    """
-    Calcaulate the distance in degrees between two lat/lon pairs.
-
-    Uses the haversine formula.
-    """
-    lat1 = radians(lat1)
-    lat2 = radians(lat2)
-    lon1 = radians(lon1)
-    lon2 = radians(lon2)
-    dlon = abs(lon2-lon1)
-
-    arg1 = (cos(lat2)*sin(dlon))**2
-    arg2 = (cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(dlon))**2
-    arg3 = sin(lat1)*sin(lat2)+cos(lat1)*cos(lat2)*cos(dlon)
-
-    dist = atan2(sqrt(arg1+arg2), arg3)
-    return degrees(dist)
 
 
 def step(ind):
@@ -249,6 +243,15 @@ st.decimate(factor=int(st[0].stats.sampling_rate), no_filter=True)
 # Scale to mm
 for tr in st:
     tr.data = tr.data * 1000
+
+# Rotate to real NEZ
+ch1_azimuth, ch1_dip, = get_channel_orientation(args.t, args.n, args.s, args.l, args.d, args.c[0])
+ch2_azimuth, ch2_dip, = get_channel_orientation(args.t, args.n, args.s, args.l, args.d, args.c[1])
+ch3_azimuth, ch3_dip, = get_channel_orientation(args.t, args.n, args.s, args.l, args.d, args.c[2])
+st[2].data, st[0].data, st[1].data = rotate2zne(st[0].data, ch1_azimuth, ch1_dip,
+                                                st[1].data, ch2_azimuth, ch2_dip,
+                                                st[2].data, ch3_azimuth, ch3_dip,
+                                                inverse=False)
 
 #
 # Make a time array
