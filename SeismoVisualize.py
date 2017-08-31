@@ -1,23 +1,22 @@
-from obspy import read
-from obspy.clients.fdsn import Client
-from obspy import UTCDateTime
-import numpy as np
+"""Create 3D ground motion visualizations of earth motion."""
+
+import argparse
+from math import atan2, cos, degrees, radians, sin, sqrt
+from sys import platform as _platform
+
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D
-from obspy.taup import getTravelTimes
-from math import degrees, radians, cos, sin, atan2, sqrt, floor
-import argparse
-from sys import platform as _platform
-
-# TODO
-# - Shade surface wave arrivals as an option
-# - Add automatic scale bar
-# - Add coordinate rotation and relabel of plots
+import numpy as np
+from obspy import UTCDateTime
+from obspy.clients.fdsn import Client
+from obspy.taup import TauPyModel
 
 
-def GetData(t0, net, st0, loc, ch, duration):
+def get_data_from_iris(t0, net, st0, loc, ch, duration):
     """
+    Download data for a station from IRIS.
+
     Download data from the IRIS datacenter and output
     with the instrument response removed and calibrated.
     A filter is also placed. Return a station object.
@@ -33,8 +32,10 @@ def GetData(t0, net, st0, loc, ch, duration):
     return st
 
 
-def GetStationLocation(t0, net, st0, loc, duration):
+def get_station_location(t0, net, st0, loc, duration):
     """
+    Get the station latitude, longitude, and elevation.
+
     Given a time, duration, loc code, and station network/name, get
     station information from IRIS.  Return a list containing the
     lat, lon, and elevation.
@@ -48,10 +49,11 @@ def GetStationLocation(t0, net, st0, loc, duration):
     return [slat, slon, selev]
 
 
-def MarkPhase(ax, phase, travel_times, yloc, fontsize=16):
+def mark_phases(ax, phase, travel_times, yloc, fontsize=16):
     """
-    Mark a phase with a letter on the plot.  The letter
-    is partially transparent until the phase arrives.
+    Mark a phase with a letter on the plot.
+
+    The letter is partially transparent until the phase arrives.
     """
     tx = None
     if phase in travel_times.keys():
@@ -62,7 +64,12 @@ def MarkPhase(ax, phase, travel_times, yloc, fontsize=16):
     return tx
 
 
-def UpdatePhaseMarker(marker, travel_time, cur_time):
+def update_phase_marker(marker, travel_time, cur_time):
+    """
+    Make the phase markers dark when the phase arrives.
+
+    Sets the alpha to 1.0.
+    """
     if cur_time >= travel_time:
         marker.set_alpha(1.0)
         return marker
@@ -70,42 +77,49 @@ def UpdatePhaseMarker(marker, travel_time, cur_time):
         return marker
 
 
-def GetTravelTimes(station, earthquake):
+def get_travel_times(station, earthquake):
     """
-    Calculate travel times for phases using obspy and reformat
-    the output to be a dictionary with phase name as key and
-    arrival time as the value.
-    """
-    dist = DegreesDistance(station[0], station[1],
-                           earthquake[0], earthquake[1])
+    Calculate travel times for phases using obspy.
 
-    tt = getTravelTimes(dist, earthquake[2])
+    Return a dictionary with phase name as key and arrival time as the value.
+    """
+    dist = get_distance_degrees(station[0], station[1],
+                                earthquake[0], earthquake[1])
+    model = TauPyModel(model='iasp91')
+    arrivals = model.get_travel_times(source_depth_in_km=earthquake[2],
+                                      distance_in_degree=dist)
     travel_times = {}
-    for item in tt:
-        travel_times[item['phase_name']] = item['time']
+    for arrival in arrivals:
+        travel_times[arrival.name] = arrival.time
     return travel_times
 
 
-def DegreesDistance(lat1, lon1, lat2, lon2):
+def get_distance_degrees(lat1, lon1, lat2, lon2):
     """
-    Calcaulate the distance in degrees between two
-    lat/lon pairs.
+    Calcaulate the distance in degrees between two lat/lon pairs.
+
+    Uses the haversine formula.
     """
     lat1 = radians(lat1)
     lat2 = radians(lat2)
     lon1 = radians(lon1)
     lon2 = radians(lon2)
-    dLon = abs(lon2-lon1)
+    dlon = abs(lon2-lon1)
 
-    arg1 = (cos(lat2)*sin(dLon))**2
-    arg2 = (cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(dLon))**2
-    arg3 = sin(lat1)*sin(lat2)+cos(lat1)*cos(lat2)*cos(dLon)
+    arg1 = (cos(lat2)*sin(dlon))**2
+    arg2 = (cos(lat1)*sin(lat2)-sin(lat1)*cos(lat2)*cos(dlon))**2
+    arg3 = sin(lat1)*sin(lat2)+cos(lat1)*cos(lat2)*cos(dlon)
 
     dist = atan2(sqrt(arg1+arg2), arg3)
     return degrees(dist)
 
 
 def step(ind):
+    """
+    Create the image for a timestep of the figure.
+
+    Step forward through the data and update the figure.
+    """
     # Slice the data to plot
     x_data = st[0].data[ind:ind+trail]
     y_data = st[1].data[ind:ind+trail]
@@ -152,21 +166,22 @@ def step(ind):
     # Plot phase arrival text markers
     for key in phase_markers:
         phase = phase_markers[key]
-        UpdatePhaseMarker(phase[0], phase[1], cur_time)
+        update_phase_marker(phase[0], phase[1], cur_time)
 
     #
     # Set figure text
     #
-    figtitle_text.set_text('%.1f Seconds After Earthquake' % t[-1])
+    figtitle_text.set_text('{:.2f} Seconds After Earthquake'.format(t[-1]))
 
     #
     # Set text for current position
     #
-    ch1value_text.set_text('E/W Position: %8.3f mm' % x_data[-1])
-    ch2value_text.set_text('N/S Position: %8.3f mm' % y_data[-1])
-    ch3value_text.set_text('U/D Position: %8.3f mm' % z_data[-1])
+    ch1value_text.set_text('E/W Position: {:8.3f} mm'.format(x_data[-1]))
+    ch2value_text.set_text('N/S Position: {:8.3f} mm'.format(y_data[-1]))
+    ch3value_text.set_text('U/D Position: {:8.3f} mm'.format(z_data[-1]))
     return (marker_line, s3d, xz_points, yz_points, xy_points,
             x_marker, y_marker, z_marker)
+
 
 #
 # Set parameters and parse arguments
@@ -196,32 +211,32 @@ ticksize = args.tick
 #
 # Get Station Information
 #
-print ('Fetching Station Information...')
-station_info = GetStationLocation(args.t, args.n, args.s, args.l, args.d)
-print ('Complete\n')
+print('Fetching Station Information...')
+station_info = get_station_location(args.t, args.n, args.s, args.l, args.d)
+print('Complete\n')
 
 
 #
 # Calculate phase arrival times
 #
-print ('Calculating travel times...')
-travel_times = GetTravelTimes(station_info, args.e)
-print ('Complete\n')
+print('Calculating travel times...')
+travel_times = get_travel_times(station_info, args.e)
+print('Complete\n')
 
 #
 # Read data and combine into stream object, channels should be in
 # order for x,y,z axes. Generall that is E-W,N-S,U-D or
 # T,R,Z for rotated systems
 #
-print ('Downloading station data:')
-print ('Ch.1')
-st1 = GetData(args.t, args.n, args.s, args.l, args.c[0], args.d)
-print ('Ch.2')
-st2 = GetData(args.t, args.n, args.s, args.l, args.c[1], args.d)
-print ('Ch.3')
-st3 = GetData(args.t, args.n, args.s, args.l, args.c[2], args.d)
+print('Downloading station data:')
+print('Ch.1')
+st1 = get_data_from_iris(args.t, args.n, args.s, args.l, args.c[0], args.d)
+print('Ch.2')
+st2 = get_data_from_iris(args.t, args.n, args.s, args.l, args.c[1], args.d)
+print('Ch.3')
+st3 = get_data_from_iris(args.t, args.n, args.s, args.l, args.c[2], args.d)
 st = st1 + st2 + st3
-print ('Complete\n')
+print('Complete\n')
 
 
 #
@@ -255,7 +270,7 @@ for tr in st:
 #
 #
 
-print ('Beginning plotting...')
+print('Beginning plotting...')
 
 #
 # Determine the limits and offsets for the 3D plot
@@ -281,13 +296,13 @@ ax2 = plt.subplot(2, 1, 2)                   # Seismogram Plot
 ax3 = plt.subplot(2, 2, 2)                   # Text Area Plot
 ax3.axis('off')  # Turn off the border for text area
 
-ax1.set_xticklabels("")
-ax1.set_yticklabels("")
-ax1.set_zticklabels("")
+ax1.set_xticklabels('')
+ax1.set_yticklabels('')
+ax1.set_zticklabels('')
 
-ax1.set_xlabel('East - West',fontsize=labelsize-2)
-ax1.set_ylabel('North - South',fontsize=labelsize-2)
-ax1.set_zlabel('Up - Down',fontsize=labelsize-2)
+ax1.set_xlabel('East - West', fontsize=labelsize-2)
+ax1.set_ylabel('North - South', fontsize=labelsize-2)
+ax1.set_zlabel('Up - Down', fontsize=labelsize-2)
 
 #
 # Setup Text on Figure
@@ -309,12 +324,12 @@ ch3label_text = ax2.text(0.75*max(time), 2.1*offset,
 #
 phase_markers = {}
 for phase in args.p:
-    phase_text = MarkPhase(ax2, phase, travel_times, max(st[2])+2.1*offset)
-    if phase_text != None:
-        print ('Adding phase {0:s} to plot at time {1:.2f}'.format(phase,travel_times[phase]))
+    phase_text = mark_phases(ax2, phase, travel_times, max(st[2])+2.1*offset)
+    if phase_text is not None:
+        print('Adding phase {0} to plot at time {1:.2f}'.format(phase, travel_times[phase]))
         phase_markers[phase] = [phase_text, travel_times[phase]]
     else:
-        print ('Phase {0:s} not found in predictions'.format(phase))
+        print('Phase {0:s} not found in predictions'.format(phase))
 
 # Lables in the text axes
 x_text_loc = 0.2
@@ -333,19 +348,19 @@ ch1value_text = ax3.text(x_text_loc, y_text_loc-3*y_text_offset,
                          '', transform=ax3.transAxes)
 
 ch3maxvalue_text = ax3.text(x_text_loc, y_text_loc-4*y_text_offset,
-                         '', transform=ax3.transAxes)
+                            '', transform=ax3.transAxes)
 
 ch2maxvalue_text = ax3.text(x_text_loc, y_text_loc-5*y_text_offset,
-                         '', transform=ax3.transAxes)
+                            '', transform=ax3.transAxes)
 
 ch1maxvalue_text = ax3.text(x_text_loc, y_text_loc-6*y_text_offset,
-                         '', transform=ax3.transAxes)
+                            '', transform=ax3.transAxes)
 
-ch1maxvalue_text.set_text('E-W Maximum Dispacement: %5.2f mm' % max(abs(st[0].data)))
-ch2maxvalue_text.set_text('N-S Maximum Dispacement: %5.2f mm' % max(abs(st[1].data)))
-ch3maxvalue_text.set_text('U-D Maximum Dispacement: %5.2f mm' % max(abs(st[2].data)))
+ch1maxvalue_text.set_text('E-W Maximum Dispacement: {:5.2f} mm'.format(max(abs(st[0].data))))
+ch2maxvalue_text.set_text('N-S Maximum Dispacement: {:5.2f} mm'.format(max(abs(st[1].data))))
+ch3maxvalue_text.set_text('U-D Maximum Dispacement: {:5.2f} mm'.format(max(abs(st[2].data))))
 
-station_text.set_text('Station %s' % args.s)
+station_text.set_text('Station {}'.format(args.s))
 
 
 #
@@ -410,9 +425,9 @@ inds = np.arange(0, len(time))
 anim = FuncAnimation(fig, step, frames=inds, interval=50,
                      repeat_delay=2000, blit=True)
 
-fname = '%s_%s_%s.mp4' % (args.n, args.s, str(args.t))
+fname = '{}_{}_{}.mp4'.format(args.n, args.s, str(args.t))
 if (_platform == 'win32'):
     fname = fname.replace(':', '-')
-print('Writing to {0}'.format(fname));
+print('Writing to {}'.format(fname))
 anim.save(fname, bitrate=2500)
 plt.close('all')
